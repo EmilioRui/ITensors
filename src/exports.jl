@@ -223,6 +223,12 @@ export
   # mps/dmrg.jl
   dmrg,
 
+  # mps/dmrgX.jl
+  dmrgX,
+
+  #dmrg3g,
+  dmrgX3S,
+
   # mps/abstractmps.jl
   # Macros
   @preserve_ortho,
