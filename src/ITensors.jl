@@ -71,6 +71,7 @@ using Random
 using SerializedElementArrays
 using StaticArrays
 using TimerOutputs
+using TupleTools
 using Zeros
 
 #####################################
@@ -180,6 +181,12 @@ include("mps/dmrg.jl")
 include("mps/dmrgX.jl")
 include("mps/dmrg3S.jl")
 include("mps/adapt.jl")
+
+#####################################
+# ITensorsNamedDimsArraysExt
+# Requires `AbstractMPS`.
+include("ITensorsNamedDimsArraysExt/src/ITensorsNamedDimsArraysExt.jl")
+using .ITensorsNamedDimsArraysExt: ITensorsNamedDimsArraysExt
 
 #####################################
 # Physics

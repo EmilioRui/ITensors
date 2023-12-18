@@ -16,11 +16,6 @@ size(m::AbstractMPS) = size(data(m))
 
 ndims(m::AbstractMPS) = ndims(data(m))
 
-# TODO: Delete once `TensorStorage` is removed.
-function NDTensors.to_arraystorage(x::AbstractMPS)
-  return NDTensors.to_arraystorage.(x)
-end
-
 function promote_itensor_eltype(m::Vector{ITensor})
   T = isassigned(m, 1) ? eltype(m[1]) : Number
   for n in 2:length(m)
@@ -1966,8 +1961,7 @@ end
 
 Swap the sites `b` and `b+1`.
 """
-function swapbondsites(ψ::AbstractMPS, b::Integer; kwargs...)
-  ortho = get(kwargs, :ortho, "right")
+function swapbondsites(ψ::AbstractMPS, b::Integer; ortho="right", kwargs...)
   ψ = copy(ψ)
   if ortho == "left"
     orthocenter = b + 1

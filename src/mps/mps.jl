@@ -970,17 +970,15 @@ dens = expect(psi, "Ntot")
 updens, dndens = expect(psi, "Nup", "Ndn") # pass more than one operator
 ```
 """
-function expect(psi::MPS, ops; kwargs...)
+function expect(psi::MPS, ops; sites=1:length(psi), site_range=nothing)
   psi = copy(psi)
   N = length(psi)
   ElT = promote_itensor_eltype(psi)
   s = siteinds(psi)
 
-  if haskey(kwargs, :site_range)
+  if !isnothing(site_range)
     @warn "The `site_range` keyword arg. to `expect` is deprecated: use the keyword `sites` instead"
-    sites = kwargs[:site_range]
-  else
-    sites = get(kwargs, :sites, 1:N)
+    sites = site_range
   end
 
   site_range = (sites isa AbstractRange) ? sites : collect(sites)
@@ -991,6 +989,7 @@ function expect(psi::MPS, ops; kwargs...)
 
   orthogonalize!(psi, start_site)
   norm2_psi = norm(psi)^2
+  iszero(norm2_psi) && error("MPS has zero norm in function `expect`")
 
   ex = map((o, el_t) -> zeros(el_t, Ns), ops, el_types)
   for (entry, j) in enumerate(site_range)

@@ -1,3 +1,6 @@
+# Private inner constructor
+function _ITensor end
+
 """
     ITensor
 
@@ -76,23 +79,21 @@ NDTensors.Dense{Float64,Array{Float64,1}}
   1.2579101497658178  -1.3559959053693322
 ```
 """
-
-## The categories in this file are
-## constructors, properties, iterators,
-## Accessor Functions, Index Functions and Operations
 mutable struct ITensor
-  tensor::Tensor
-  function ITensor(::AllowAlias, T::Tensor{<:Any,<:Any,<:Any,<:Tuple})
-    @debug_check begin
-      is = inds(T)
-      if !allunique(is)
-        error(
-          "Trying to create ITensors with collection of indices $is. Indices must be unique.",
-        )
-      end
+  tensor
+  global @inline _ITensor(parent) = new(parent)
+end
+
+function ITensor(::AllowAlias, T::Tensor{<:Any,<:Any,<:Any,<:Tuple})
+  @debug_check begin
+    is = inds(T)
+    if !allunique(is)
+      error(
+        "Trying to create ITensors with collection of indices $is. Indices must be unique."
+      )
     end
-    return new(T)
   end
+  return _ITensor(T)
 end
 
 #########################
@@ -124,11 +125,6 @@ ITensor(is, st::TensorStorage)::ITensor = ITensor(NeverAlias(), st, is)
 
 itensor(T::ITensor) = T
 ITensor(T::ITensor) = copy(T)
-
-# TODO: Delete once `TensorStorage` is removed.
-function NDTensors.to_arraystorage(x::ITensor)
-  return itensor(NDTensors.to_arraystorage(tensor(x)))
-end
 
 """
     itensor(args...; kwargs...)
@@ -1870,7 +1866,7 @@ end
 # Unfortunately this is more complicated than it might seem since it
 # has to pass through the broadcasting mechanism first.
 function (A::ITensor + B::ITensor)
-  return _add(tensor(A), tensor(B))
+  return itensor(_add(tensor(A), tensor(B)))
 end
 
 # TODO: move the order-0 EmptyStorage ITensor special to NDTensors
@@ -2073,8 +2069,7 @@ function show(io::IO, mime::MIME"text/plain", T::ITensor)
   return summary(io, T)
 end
 
-function readcpp(io::IO, ::Type{Dense{ValT}}; kwargs...) where {ValT}
-  format = get(kwargs, :format, "v3")
+function readcpp(io::IO, ::Type{Dense{ValT}}; format="v3") where {ValT}
   if format == "v3"
     size = read(io, UInt64)
     data = Vector{ValT}(undef, size)
@@ -2087,8 +2082,7 @@ function readcpp(io::IO, ::Type{Dense{ValT}}; kwargs...) where {ValT}
   end
 end
 
-function readcpp(io::IO, ::Type{ITensor}; kwargs...)
-  format = get(kwargs, :format, "v3")
+function readcpp(io::IO, ::Type{ITensor}; format="v3")
   if format == "v3"
     # TODO: use Vector{Index} here?
     inds = readcpp(io, IndexSet; kwargs...)

@@ -1,11 +1,12 @@
 module NDTensors
-
+# TODO: List types, macros, and functions being used.
 using Adapt
 using Base.Threads
 using Compat
 using Dictionaries
 using FLoops
 using Folds
+using GPUArraysCore
 using InlineStrings
 using Random
 using LinearAlgebra
@@ -18,20 +19,28 @@ using Strided
 using TimerOutputs
 using TupleTools
 
-include("SetParameters/src/SetParameters.jl")
-using .SetParameters
-include("DiagonalArrays/src/DiagonalArrays.jl")
-using .DiagonalArrays
-include("BlockSparseArrays/src/BlockSparseArrays.jl")
-using .BlockSparseArrays
-include("SmallVectors/src/SmallVectors.jl")
-using .SmallVectors
-include("SortedSets/src/SortedSets.jl")
-using .SortedSets
-include("TagSets/src/TagSets.jl")
-using .TagSets
-include("Unwrap/src/Unwrap.jl")
-using .Unwrap
+for lib in [
+  :AlgorithmSelection,
+  :AllocateData,
+  :BaseExtensions,
+  :SetParameters,
+  :BroadcastMapConversion,
+  :Unwrap,
+  :RankFactorization,
+  :GradedAxes,
+  :TensorAlgebra,
+  :SparseArrayInterface,
+  :SparseArrayDOKs,
+  :DiagonalArrays,
+  :BlockSparseArrays,
+  :NamedDimsArrays,
+  :SmallVectors,
+  :SortedSets,
+  :TagSets,
+]
+  include("lib/$(lib)/src/$(lib).jl")
+  @eval using .$lib: $lib
+end
 
 using Base: @propagate_inbounds, ReshapedArray, DimOrInd, OneTo
 
@@ -49,7 +58,6 @@ include("exports.jl")
 # General functionality
 #
 include("default_kwargs.jl")
-include("algorithm.jl")
 include("aliasstyle.jl")
 include("abstractarray/set_types.jl")
 include("abstractarray/to_shape.jl")
@@ -75,8 +83,8 @@ include("dims.jl")
 include("tensor/set_types.jl")
 include("tensor/similar.jl")
 include("adapt.jl")
-include("tensoralgebra/generic_tensor_operations.jl")
-include("tensoralgebra/contraction_logic.jl")
+include("tensoroperations/generic_tensor_operations.jl")
+include("tensoroperations/contraction_logic.jl")
 include("abstractarray/tensoralgebra/contract.jl")
 
 #####################################
@@ -129,53 +137,6 @@ include("empty/empty.jl")
 include("empty/EmptyTensor.jl")
 include("empty/tensoralgebra/contract.jl")
 include("empty/adapt.jl")
-
-#####################################
-# Array Tensor (experimental)
-#
-
-# TODO: Turn this into a module `CombinerArray`.
-include("arraystorage/combiner/storage/combinerarray.jl")
-
-include("arraystorage/arraystorage/storage/arraystorage.jl")
-include("arraystorage/arraystorage/storage/conj.jl")
-include("arraystorage/arraystorage/storage/permutedims.jl")
-include("arraystorage/arraystorage/storage/contract.jl")
-
-include("arraystorage/arraystorage/tensor/arraystorage.jl")
-include("arraystorage/arraystorage/tensor/zeros.jl")
-include("arraystorage/arraystorage/tensor/indexing.jl")
-include("arraystorage/arraystorage/tensor/permutedims.jl")
-include("arraystorage/arraystorage/tensor/mul.jl")
-include("arraystorage/arraystorage/tensor/contract.jl")
-include("arraystorage/arraystorage/tensor/qr.jl")
-include("arraystorage/arraystorage/tensor/eigen.jl")
-include("arraystorage/arraystorage/tensor/svd.jl")
-
-# DiagonalArray storage
-include("arraystorage/diagonalarray/storage/contract.jl")
-
-include("arraystorage/diagonalarray/tensor/contract.jl")
-
-# BlockSparseArray storage
-include("arraystorage/blocksparsearray/storage/unwrap.jl")
-include("arraystorage/blocksparsearray/storage/contract.jl")
-
-## TODO: Delete once it is rewritten for array storage types.
-## include("arraystorage/blocksparsearray/tensor/combiner/contract_uncombine.jl")
-
-# Combiner storage
-include("arraystorage/combiner/storage/promote_rule.jl")
-include("arraystorage/combiner/storage/contract_utils.jl")
-include("arraystorage/combiner/storage/contract.jl")
-
-include("arraystorage/combiner/tensor/to_arraystorage.jl")
-include("arraystorage/combiner/tensor/contract.jl")
-
-include("arraystorage/blocksparsearray/storage/combiner/contract.jl")
-include("arraystorage/blocksparsearray/storage/combiner/contract_utils.jl")
-include("arraystorage/blocksparsearray/storage/combiner/contract_combine.jl")
-include("arraystorage/blocksparsearray/storage/combiner/contract_uncombine.jl")
 
 #####################################
 # Deprecations
@@ -295,10 +256,6 @@ end
 # Optional backends
 #
 
-if !isdefined(Base, :get_extension)
-  using Requires
-end
-
 const _using_tblis = Ref(false)
 
 using_tblis() = _using_tblis[]
@@ -315,26 +272,9 @@ end
 
 function backend_octavian end
 
+using PackageExtensionCompat
 function __init__()
-  @static if !isdefined(Base, :get_extension)
-    @require TBLIS = "48530278-0828-4a49-9772-0f3830dfa1e9" begin
-      enable_tblis()
-      include("../ext/NDTensorsTBLISExt/NDTensorsTBLISExt.jl")
-    end
-    @require Octavian = "6fd5a793-0b7e-452c-907f-f8bfe9c57db4" begin
-      include("../ext/NDTensorsOctavianExt/NDTensorsOctavianExt.jl")
-    end
-
-    @require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" begin
-      if CUDA.functional()
-        include("../ext/NDTensorsCUDAExt/NDTensorsCUDAExt.jl")
-      end
-    end
-
-    @require Metal = "dde4c033-4e86-420c-a63e-0dd931031962" begin
-      include("../ext/NDTensorsMetalExt/NDTensorsMetalExt.jl")
-    end
-  end
+  @require_extensions
 end
 
 end # module NDTensors

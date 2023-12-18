@@ -1,3 +1,5 @@
+using .RankFactorization: Spectrum
+
 #
 # Linear Algebra of order 2 NDTensors
 #
@@ -26,30 +28,6 @@ function LinearAlgebra.exp(
   # so extract the parent matrix
   expTM = parent(exp(matrix(T)))
   return tensor(Dense(vec(expTM)), inds(T))
-end
-
-"""
-  Spectrum
-contains the (truncated) density matrix eigenvalue spectrum which is computed during a
-decomposition done by `svd` or `eigen`. In addition stores the truncation error.
-"""
-struct Spectrum{VecT<:Union{AbstractVector,Nothing},ElT<:Real}
-  eigs::VecT
-  truncerr::ElT
-end
-
-eigs(s::Spectrum) = s.eigs
-truncerror(s::Spectrum) = s.truncerr
-
-function entropy(s::Spectrum)
-  S = 0.0
-  eigs_s = eigs(s)
-  isnothing(eigs_s) &&
-    error("Spectrum does not contain any eigenvalues, cannot compute the entropy")
-  for p in eigs_s
-    p > 1e-13 && (S -= p * log(p))
-  end
-  return S
 end
 
 function svd_catch_error(A; kwargs...)
@@ -157,7 +135,7 @@ function svd(
   spec = Spectrum(P, truncerr)
   dS = length(P)
   if dS < length(MS)
-    MU = MU[:, 1:dS]
+    MU = expose(MU)[:, 1:dS]
     # Fails on some GPU backends like Metal.
     # resize!(MS, dS)
     MS = MS[1:dS]
@@ -176,7 +154,7 @@ function svd(
   return U, S, V, spec
 end
 
-function eigen(
+function LinearAlgebra.eigen(
   T::Hermitian{ElT,<:DenseTensor{ElT,2,IndsT}};
   mindim=nothing,
   maxdim=nothing,
@@ -187,6 +165,7 @@ function eigen(
   matrixT = matrix(T)
   ## TODO Here I am calling parent to ensure that the correct `any` function
   ## is envoked for non-cpu matrices
+  ## TODO use expose here
   if any(!isfinite, parent(matrixT))
     throw(
       ArgumentError(
@@ -195,6 +174,7 @@ function eigen(
     )
   end
 
+  ### What do we do if DM is full of Nan or Inf?
   DM, VM = eigen(expose(matrixT))
 
   # Sort by largest to smallest eigenvalues
@@ -282,7 +262,7 @@ random_orthog(::Type{ElT}, n::Int, m::Int) where {ElT<:Real} = random_unitary(El
 
 random_orthog(n::Int, m::Int) = random_orthog(Float64, n, m)
 
-function eigen(
+function LinearAlgebra.eigen(
   T::DenseTensor{ElT,2,IndsT};
   mindim=nothing,
   maxdim=nothing,
