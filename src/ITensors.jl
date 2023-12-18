@@ -178,6 +178,8 @@ include("mps/projmps.jl")
 include("mps/projmpo_mps.jl")
 include("mps/observer.jl")
 include("mps/dmrg.jl")
+include("mps/dmrgX.jl")
+include("mps/dmrg3S.jl")
 include("mps/adapt.jl")
 
 #####################################
