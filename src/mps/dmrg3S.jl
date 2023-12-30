@@ -1,8 +1,8 @@
 
-macro timeit(args...)
-  # Redefine the behavior of the @timeit macro here
-  return quote end
-end
+# macro timeit(args...)
+#   # Redefine the behavior of the @timeit macro here
+#   return quote end
+# end
 
 function islinkind(ind::Index)
   """
@@ -59,7 +59,7 @@ function dmrg_x_solver3S(
     D, U = eigen(H; ishermitian=false)
   end
 
-  U_inds = inds(U)[1:(end-1)]
+  U_inds = inds(U)[1:(end - 1)]
   eig_inds = inds(U)[end]
   psi = deepcopy(psi0)
   overlaps = zeros(eig_inds.space)
@@ -73,7 +73,7 @@ function dmrg_x_solver3S(
     iteration_range = is_growing ? (1:(eig_inds.space)) : (eig_inds.space):-1:1
     N_iterations = 0
     spec = []
-    println("b= ", b)
+    # println("b= ", b)
     for i in iteration_range
       N_iterations += 1
       temp_psi = deepcopy(psi)
@@ -89,7 +89,7 @@ function dmrg_x_solver3S(
       if (b == 1 && ha == 1) || (b == N && ha == -1)
         P = temp_psi[b] * PH.H[b]
       else
-        P = PH.LR[b-ha] * temp_psi[b] * PH.H[b]
+        P = PH.LR[b - ha] * temp_psi[b] * PH.H[b]
       end
       P *= alpha
       #position of the link is b for left to right sweep and b-1 for right to left
@@ -109,19 +109,20 @@ function dmrg_x_solver3S(
       #adding zeros to the neighbouring site
       bd = new_index.space
       new_index = Index(bd)
-      current_idxs = inds(temp_psi[b+ha])
+      current_idxs = inds(temp_psi[b + ha])
       new_idcs = [ind == old_idx ? new_index : ind for ind in current_idxs]
       new_tensor = ITensor(0, new_idcs)
       direction = [old_idx, new_index]
       temp_link_ind = first(directsum!(temp_psi, new_tensor, b + ha, direction))
-      new_idcs = [ind == temp_link_ind ? new_linkind : ind for ind in inds(temp_psi[b+ha])]
-      temp_psi[b+ha] = change_index(temp_psi[b+ha], temp_link_ind, new_linkind)
-
+      new_idcs = [
+        ind == temp_link_ind ? new_linkind : ind for ind in inds(temp_psi[b + ha])
+      ]
+      temp_psi[b + ha] = change_index(temp_psi[b + ha], temp_link_ind, new_linkind)
 
       if ortho == "left"
         L, R, spec = factorize(
           temp_psi[b],
-          [linkind(temp_psi, b - 1), siteind(psi, b)];
+          [linkind(temp_psi, b - 1), siteind(temp_psi, b)];
           maxdim=maxdim(sweeps, sw),
           mindim=mindim(sweeps, sw),
           cutoff=cutoff(sweeps, sw),
@@ -131,12 +132,12 @@ function dmrg_x_solver3S(
           tags=tags(linkind(temp_psi, linkpos)),
         )
         temp_psi[b] = L
-        temp_psi[b+ha] *= R
+        temp_psi[b + ha] *= R
 
       else
         L, R, spec = factorize(
           temp_psi[b],
-          [linkind(psi, b - 1)];
+          [linkind(temp_psi, b - 1)];
           maxdim=maxdim(sweeps, sw),
           mindim=mindim(sweeps, sw),
           cutoff=cutoff(sweeps, sw),
@@ -146,8 +147,9 @@ function dmrg_x_solver3S(
           tags=tags(linkind(psi, linkpos)),
         )
         temp_psi[b] = R
-        temp_psi[b+ha] *= L
+        temp_psi[b + ha] *= L
       end
+
       normalize!(temp_psi)
 
       overlaps[ind.second] = abs(inner(temp_psi, target))^2
@@ -230,6 +232,7 @@ function dmrgX3S(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
     println("Exact diagonalization: ", exact_diag)
     println("GPU usage: ", gpu)
     println("IS GROUND STATE: ", is_gs)
+    println("SINGLE SITEEEEE")
   end
   if haskey(kwargs, :maxiter)
     error("""maxiter keyword has been replaced by eigsolve_krylovdim.
@@ -259,7 +262,7 @@ function dmrgX3S(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
 
   if !isnothing(write_when_maxdim_exceeds)
     if (maxlinkdim(psi) > write_when_maxdim_exceeds) ||
-       (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
+      (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
       PH = disk(PH; path=write_path)
     end
   end
@@ -271,7 +274,7 @@ function dmrgX3S(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
       maxtruncerr = 0.0
 
       if !isnothing(write_when_maxdim_exceeds) &&
-         maxdim(sweeps, sw) > write_when_maxdim_exceeds
+        maxdim(sweeps, sw) > write_when_maxdim_exceeds
         if outputlevel >= 2
           println(
             "\nWriting environment tensors do disk (write_when_maxdim_exceeds = $write_when_maxdim_exceeds and maxdim(sweeps, sw) = $(maxdim(sweeps, sw))).\nFiles located at path=$write_path\n",

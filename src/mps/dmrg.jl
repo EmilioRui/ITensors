@@ -353,6 +353,7 @@ function _dmrg_sweeps(;
   mindim=default_mindim(),
   cutoff=default_cutoff(),
   noise=default_noise(),
+  kwargs...,
 )
   sweeps = Sweeps(nsweeps)
   setmaxdim!(sweeps, maxdim...)
