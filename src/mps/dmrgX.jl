@@ -239,13 +239,13 @@ function dmrg_x_solver(
   phi,
   kwargs...,
 )
-  gpu = occursin("CUDA",  string(typeof(psi0[1].tensor)))
+  gpu = occursin("CUDA", string(typeof(psi0[1].tensor)))
   if exact_diag
     H = contract(PH, ITensor(true))
     H⁺ = swapprime(dag(H), 0 => 1)
     # println(inds(H))
     time_diag = @elapsed begin
-      D, U = eigen(.5*(H+H⁺); ishermitian=true)
+      D, U = eigen(0.5 * (H + H⁺); ishermitian=true)
     end
     # println("-----\n Diagonalization time: ", time_diag)
     #println(cutoff)
@@ -269,7 +269,7 @@ function dmrg_x_solver(
         if gpu
           eigenvector = U * NDTensors.cu(onehot(ComplexF64, ind))
         else
-        eigenvector = U * onehot(ComplexF64, ind)
+          eigenvector = U * onehot(ComplexF64, ind)
         end
         global spec = replacebond!(
           psi,
@@ -315,6 +315,9 @@ function dmrg_x_solver(
     return U_max, eig, spec, psi
 
   else
+    H = contract(PH, ITensor(true))
+    H⁺ = swapprime(dag(H), 0 => 1)
+    H_alg = 0.5 * (H + H⁺)
     println("Lanczos alg")
     eigsolve_tol = 1e-14
     eigsolve_verbosity = 1
@@ -329,14 +332,15 @@ function dmrg_x_solver(
       eigsolve_maxiter = 10000
 
       vals, vecs, info = eigsolve(
-        PH,
+        H_alg,
         phi,
         n_eigs,
         eigsolve_which_eigenvalue;
-        ishermitian=false,
+        ishermitian=true,
         tol=eigsolve_tol,
         krylovdim=eigsolve_krylovdim,
         maxiter=eigsolve_maxiter,
+        verbosity=2,
       )
 
       # println("Info : $info")

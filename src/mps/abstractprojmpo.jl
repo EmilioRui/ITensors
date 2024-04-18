@@ -13,7 +13,7 @@ nsite(P::AbstractProjMPO) = P.nsite
 set_nsite!(::AbstractProjMPO, nsite) = error("Not implemented")
 
 # The range of center sites
-site_range(P::AbstractProjMPO) = (P.lpos + 1):(P.rpos - 1)
+site_range(P::AbstractProjMPO) = (P.lpos+1):(P.rpos-1)
 
 """
     length(P::ProjMPO)
@@ -144,8 +144,8 @@ function _makeL!(P::AbstractProjMPO, psi::MPS, k::Int)::Union{ITensor,Nothing}
   ll = max(ll, 0)
   L = lproj(P)
   while ll < k
-    L = L * psi[ll + 1] * P.H[ll + 1] * dag(prime(psi[ll + 1]))
-    P.LR[ll + 1] = L
+    L = L * psi[ll+1] * P.H[ll+1] * dag(prime(psi[ll+1]))
+    P.LR[ll+1] = L
     ll += 1
   end
   # Needed when moving lproj backward.
@@ -174,8 +174,8 @@ function _makeR!(P::AbstractProjMPO, psi::MPS, k::Int)::Union{ITensor,Nothing}
   rl = min(rl, N + 1)
   R = rproj(P)
   while rl > k
-    R = R * psi[rl - 1] * P.H[rl - 1] * dag(prime(psi[rl - 1]))
-    P.LR[rl - 1] = R
+    R = R * psi[rl-1] * P.H[rl-1] * dag(prime(psi[rl-1]))
+    P.LR[rl-1] = R
     rl -= 1
   end
   P.rpos = k
