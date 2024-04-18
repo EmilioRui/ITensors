@@ -231,6 +231,7 @@ export
 
   #dmrg3g,
   dmrgX3S,
+  dmrgX_single_site,
 
   # mps/abstractmps.jl
   # Macros
@@ -360,6 +361,8 @@ export
   AutoMPO,
   OpSum,
   add!,
+  sorteachterm,
+  sortmergeterms,
 
   # physics/fermions.jl
   fparity,

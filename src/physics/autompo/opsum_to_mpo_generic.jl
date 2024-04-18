@@ -290,7 +290,7 @@ H = MPO(os,sites; splitblocks=false)
 ```
 """
 function MPO(os::OpSum, sites::Vector{<:Index}; splitblocks=true, kwargs...)::MPO
-  length(terms(os)) == 0 && error("OpSum has no terms")
+  length(terms(os)) == 0 && error(" OpSum has no terms")
 
   os = deepcopy(os)
   os = sorteachterm(os, sites)

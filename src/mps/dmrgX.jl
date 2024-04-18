@@ -239,11 +239,13 @@ function dmrg_x_solver(
   phi,
   kwargs...,
 )
+  gpu = occursin("CUDA",  string(typeof(psi0[1].tensor)))
   if exact_diag
     H = contract(PH, ITensor(true))
+    H⁺ = swapprime(dag(H), 0 => 1)
     # println(inds(H))
     time_diag = @elapsed begin
-      D, U = eigen(H; ishermitian=false)
+      D, U = eigen(.5*(H+H⁺); ishermitian=true)
     end
     # println("-----\n Diagonalization time: ", time_diag)
     #println(cutoff)
@@ -264,8 +266,11 @@ function dmrg_x_solver(
         N_iterations += 1
         #X is the eigenvectors
         ind = eig_inds[i]
+        if gpu
+          eigenvector = U * NDTensors.cu(onehot(ComplexF64, ind))
+        else
         eigenvector = U * onehot(ComplexF64, ind)
-
+        end
         global spec = replacebond!(
           psi,
           b,
@@ -287,9 +292,9 @@ function dmrg_x_solver(
 
         if overlaps[max_ind] > (1 - sum_overlap)
           global max_overlap = overlaps[max_ind]
-          println("max_ind: ", max_ind)
-          println("max overlap: ", max_overlap)
-          println("N_iterations: ", N_iterations)
+          # println("max_ind: ", max_ind)
+          # println("max overlap: ", max_overlap)
+          # println("N_iterations: ", N_iterations)
           break
         end
       end
@@ -300,7 +305,11 @@ function dmrg_x_solver(
     U_max = 0
     eig = 0
 
-    U_max = U * dag(onehot(u => max_ind))
+    if gpu
+      U_max = U * NDTensors.cu(dag(onehot(u => max_ind)))
+    else
+      U_max = U * dag(onehot(u => max_ind))
+    end
     eig = D[max_ind, max_ind]
 
     return U_max, eig, spec, psi
@@ -486,7 +495,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
   n_eigs = get(kwargs, :n_eigs, 10)
 
   which_decomp::Union{String,Nothing} = get(kwargs, :which_decomp, "svd")
-  svd_alg::String = get(kwargs, :svd_alg, "divide_and_conquer")
+  svd_alg = get(kwargs, :svd_alg, nothing)#"divide_and_conquer")
   obs = get(kwargs, :observer, NoObserver())
   outputlevel::Int = get(kwargs, :outputlevel, 1)
 

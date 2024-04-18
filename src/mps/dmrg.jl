@@ -234,6 +234,15 @@ function dmrg(
         end
 
         @timeit_debug timer "dmrg: eigsolve" begin
+          # if ishermitian
+          #   H = PH.H
+          #   H⁺ = swapprime(dag(PH.H), 0 => 1)
+          #   H_herm = 0.5 * (H + H⁺)
+          #   PH = ProjMPO(H_herm)
+          #   position!(PH, psi, b)
+          #   # println("CIAO")
+          #   # println(contract(PH, ITensor(true)))
+          # end
           vals, vecs = eigsolve(
             PH,
             phi,
