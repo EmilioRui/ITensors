@@ -237,6 +237,7 @@ function dmrg_x_solver(
   is_gs::Bool=false,
   exact_diag=true,
   phi,
+  outputlevel=outputlevel,
   kwargs...,
 )
   gpu = occursin("CUDA", string(typeof(psi0[1].tensor)))
@@ -292,9 +293,11 @@ function dmrg_x_solver(
 
         if overlaps[max_ind] > (1 - sum_overlap)
           global max_overlap = overlaps[max_ind]
-          # println("max_ind: ", max_ind)
-          # println("max overlap: ", max_overlap)
-          # println("N_iterations: ", N_iterations)
+          if outputlevel >= 2
+            println("max_ind: ", max_ind)
+            println("max overlap: ", max_overlap)
+            println("N_iterations: ", N_iterations)
+          end
           break
         end
       end
@@ -590,7 +593,9 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
       end
 
       for (b, ha) in sweepnext(N)
-
+        if outputlevel >= 2
+          println("Optimizing bond: ", b)
+        end
         #@timeit_debug timer "dmrg: position!" begin
         PH = position!(PH, psi, b)
 
@@ -620,6 +625,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
           is_gs=is_gs,
           exact_diag=exact_diag,
           phi=phi,
+          outputlevel=outputlevel,
         )
 
         drho = nothing
