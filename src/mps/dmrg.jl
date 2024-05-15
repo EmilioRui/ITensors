@@ -193,7 +193,7 @@ function dmrg(
 
   if !isnothing(write_when_maxdim_exceeds)
     if (maxlinkdim(psi) > write_when_maxdim_exceeds) ||
-       (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
+      (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
       PH = disk(PH; path=write_path)
     end
   end
@@ -205,7 +205,7 @@ function dmrg(
       maxtruncerr = 0.0
 
       if !isnothing(write_when_maxdim_exceeds) &&
-         maxdim(sweeps, sw) > write_when_maxdim_exceeds
+        maxdim(sweeps, sw) > write_when_maxdim_exceeds
         if outputlevel >= 2
           println(
             "\nWriting environment tensors do disk (write_when_maxdim_exceeds = $write_when_maxdim_exceeds and maxdim(sweeps, sw) = $(maxdim(sweeps, sw))).\nFiles located at path=$write_path\n",
@@ -230,18 +230,10 @@ function dmrg(
         end
 
         @timeit_debug timer "dmrg: psi[b]*psi[b+1]" begin
-          phi = psi[b] * psi[b+1]
+          phi = psi[b] * psi[b + 1]
         end
 
         @timeit_debug timer "dmrg: eigsolve" begin
-          # if ishermitian
-          #   H = contract(PH, ITensor(true))
-          #   H⁺ = swapprime(dag(H), 0 => 1)
-          #   H_alg = 0.5 * (H + H⁺)
-          # else
-          #   H_alg = PH
-          # end
-          println("index: ", b)
           vals, vecs = eigsolve(
             PH,
             phi,
