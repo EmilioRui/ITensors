@@ -234,16 +234,16 @@ function dmrg(
         end
 
         @timeit_debug timer "dmrg: eigsolve" begin
-          if ishermitian
-            H = contract(PH, ITensor(true))
-            H⁺ = swapprime(dag(H), 0 => 1)
-            H_alg = 0.5 * (H + H⁺)
-          else
-            H_alg = PH
-          end
+          # if ishermitian
+          #   H = contract(PH, ITensor(true))
+          #   H⁺ = swapprime(dag(H), 0 => 1)
+          #   H_alg = 0.5 * (H + H⁺)
+          # else
+          #   H_alg = PH
+          # end
           println("index: ", b)
           vals, vecs = eigsolve(
-            H_alg,
+            PH,
             phi,
             1,
             eigsolve_which_eigenvalue;

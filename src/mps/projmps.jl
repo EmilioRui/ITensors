@@ -34,10 +34,10 @@ function product(P::ProjMPS, v::ITensor)::ITensor
     error("Only two-site ProjMPS currently supported")
   end
 
-  Lpm = dag(prime(P.M[P.lpos + 1], "Link"))
+  Lpm = dag(prime(P.M[P.lpos+1], "Link"))
   !isnothing(lproj(P)) && (Lpm *= lproj(P))
 
-  Rpm = dag(prime(P.M[P.rpos - 1], "Link"))
+  Rpm = dag(prime(P.M[P.rpos-1], "Link"))
   !isnothing(rproj(P)) && (Rpm *= rproj(P))
 
   pm = Lpm * Rpm
@@ -47,6 +47,26 @@ function product(P::ProjMPS, v::ITensor)::ITensor
   Mv = pv * dag(pm)
 
   return noprime(Mv)
+end
+
+function contract(P::ProjMPS, v::ITensor)::ITensor
+  itensor_map = Union{ITensor,OneITensor}[lproj(P)]
+  append!(itensor_map, P.M[site_range(P)])
+  push!(itensor_map, rproj(P))
+
+  # Reverse the contraction order of the map if
+  # the first tensor is a scalar (for example we
+  # are at the left edge of the system)
+  if dim(first(itensor_map)) == 1
+    reverse!(itensor_map)
+  end
+
+  # Apply the map
+  Hv = v
+  for it in itensor_map
+    Hv *= it
+  end
+  return Hv
 end
 
 #function Base.eltype(P::ProjMPS)
@@ -86,7 +106,7 @@ function makeL!(P::ProjMPS, psi::MPS, k::Int)
       P.LR[1] = psi[1] * dag(prime(P.M[1], "Link"))
       P.lpos = 1
     else
-      P.LR[ll + 1] = P.LR[ll] * psi[ll + 1] * dag(prime(P.M[ll + 1], "Link"))
+      P.LR[ll+1] = P.LR[ll] * psi[ll+1] * dag(prime(P.M[ll+1], "Link"))
       P.lpos += 1
     end
   end
@@ -100,7 +120,7 @@ function makeR!(P::ProjMPS, psi::MPS, k::Int)
       P.LR[N] = psi[N] * dag(prime(P.M[N], "Link"))
       P.rpos = N
     else
-      P.LR[rl - 1] = P.LR[rl] * psi[rl - 1] * dag(prime(P.M[rl - 1], "Link"))
+      P.LR[rl-1] = P.LR[rl] * psi[rl-1] * dag(prime(P.M[rl-1], "Link"))
       P.rpos -= 1
     end
   end

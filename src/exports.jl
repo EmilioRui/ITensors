@@ -329,6 +329,13 @@ export
   # mps/projmpo_mps.jl
   ProjMPO_MPS,
 
+  # mps/projmps.jl
+  ProjMPS,
+  lproj,
+  product,
+  rproj,
+  position!,
+
   # mps/sweeps.jl
   Sweeps,
   cutoff,

@@ -237,6 +237,7 @@ function dmrg_x_solver(
   is_gs::Bool=false,
   exact_diag=true,
   phi,
+  outputlevel::Int=0,
   kwargs...,
 )
   gpu = occursin("CUDA", string(typeof(psi0[1].tensor)))
@@ -256,11 +257,11 @@ function dmrg_x_solver(
     overlaps = zeros(eig_inds.space)
     # println("EIG INDS: ", eig_inds)
     sum_overlap = 0.0
-    max_ind = eig_inds.space
 
     overlaps_time = @elapsed begin
       is_growing = abs(D[1, 1]) < abs(D[end, end])
       iteration_range = is_growing ? (1:(eig_inds.space)) : (eig_inds.space):-1:1
+      max_ind = iteration_range[1]
       N_iterations = 0
       for i in iteration_range
         N_iterations += 1
@@ -292,11 +293,15 @@ function dmrg_x_solver(
 
         if overlaps[max_ind] > (1 - sum_overlap)
           global max_overlap = overlaps[max_ind]
-          # println("max_ind: ", max_ind)
-          # println("max overlap: ", max_overlap)
-          # println("N_iterations: ", N_iterations)
+
           break
         end
+      end
+      if outputlevel >= 2
+        println("max_ind: ", max_ind)
+        println("max overlap: ", max_overlap)
+        println("N_iterations: ", N_iterations)
+        println("eig", D[max_ind, max_ind])
       end
     end
 
@@ -318,7 +323,9 @@ function dmrg_x_solver(
     H = contract(PH, ITensor(true))
     H⁺ = swapprime(dag(H), 0 => 1)
     H_alg = 0.5 * (H + H⁺)
-    println("Lanczos alg")
+    if outputlevel >= 2
+      println("Lanczos alg")
+    end
     eigsolve_tol = 1e-14
     eigsolve_verbosity = 1
 
@@ -326,7 +333,9 @@ function dmrg_x_solver(
     n_eigs = 0
     while increase_eig
       n_eigs += 1
-      println("n_eigs_Lanczos: $n_eigs")
+      if outputlevel >= 2
+        println("n_eigs_Lanczos: $n_eigs")
+      end
       eigsolve_krylovdim = 2 * n_eigs + 1
       eigsolve_which_eigenvalue = :SR
       eigsolve_maxiter = 10000
@@ -372,8 +381,12 @@ function dmrg_x_solver(
           end
           if overlaps[max_ind] > (1 - sum_overlap)
             global max_overlap = overlaps[max_ind]
-            println("N_iterations: ", max_ind)
-            println("Max overlap: ", max_overlap)
+            if outputlevel >= 2
+              println("max_ind: ", max_ind)
+              println("max overlap: ", max_overlap)
+              println("N_iterations: ", max_ind)
+            end
+
             increase_eig = false
             return vecs[max_ind], vals[max_ind], spec, psi
 
@@ -590,7 +603,9 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
       end
 
       for (b, ha) in sweepnext(N)
-
+        if outputlevel >= 2
+          println("index: ", b)
+        end
         #@timeit_debug timer "dmrg: position!" begin
         PH = position!(PH, psi, b)
 
@@ -620,6 +635,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
           is_gs=is_gs,
           exact_diag=exact_diag,
           phi=phi,
+          outputlevel=outputlevel,
         )
 
         drho = nothing
