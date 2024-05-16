@@ -76,7 +76,7 @@ function get_amplitude2(psi::MPS, eigenvector, bitstring, b, left, right)
   overlap *= (
     eigenvector *
     state(siteind(psi, b), bitstring[b]) *
-    state(siteind(psi, b + 1), bitstring[b + 1])
+    state(siteind(psi, b + 1), bitstring[b+1])
   )
   overlap *= left * right
   # elseif j == b + 1
@@ -141,7 +141,7 @@ function dmrg_x_solver_new(
   end
   # println("-----\n Diagonalization time: ", time_diag)
   #println(cutoff)
-  U_inds = inds(U)[1:(end - 1)]
+  U_inds = inds(U)[1:(end-1)]
   eig_inds = inds(U)[end]
   psi = deepcopy(psi0)
 
@@ -157,13 +157,13 @@ function dmrg_x_solver_new(
 
   #Definition of left and right contractions that are not touched by the setcutoff
   left = ITensor(1.0)
-  for j in 1:(b - 1)
+  for j in 1:(b-1)
     site = siteind(psi, j)
     left *= extract_tensor(psi[j], target_bitstring[j], site)
     #left *= (psi[j] * state(site, target_bitstring[j]))
   end
   right = ITensor(1.0)
-  for j in (b + 2):length(psi)
+  for j in (b+2):length(psi)
     site = siteind(psi, j)
     right *= extract_tensor(psi[j], target_bitstring[j], site)
     # println(right)
@@ -238,7 +238,6 @@ function dmrg_x_solver(
   exact_diag=true,
   phi,
   outputlevel::Int=0,
-  outputlevel=outputlevel,
   kwargs...,
 )
   gpu = occursin("CUDA", string(typeof(psi0[1].tensor)))
@@ -251,7 +250,7 @@ function dmrg_x_solver(
     end
     # println("-----\n Diagonalization time: ", time_diag)
     #println(cutoff)
-    U_inds = inds(U)[1:(end - 1)]
+    U_inds = inds(U)[1:(end-1)]
     eig_inds = inds(U)[end]
     psi = deepcopy(psi0)
 
@@ -427,7 +426,7 @@ function dmrg_x_solver_ss(
     if pos == length(PH.H)
       pos = b - 1
     end
-    chi = psi0[pos] * psi0[pos + 1]
+    chi = psi0[pos] * psi0[pos+1]
     PH.nsite = 2
     position!(PH, psi0, pos)
 
@@ -455,7 +454,7 @@ function dmrg_x_solver_ss(
     D, U = eigen(H; ishermitian=false)
   end
 
-  U_inds = inds(U)[1:(end - 1)]
+  U_inds = inds(U)[1:(end-1)]
   eig_inds = inds(U)[end]
   psi = deepcopy(psi0)
   overlaps = zeros(eig_inds.space)
@@ -586,7 +585,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
 
   if !isnothing(write_when_maxdim_exceeds)
     if (maxlinkdim(psi) > write_when_maxdim_exceeds) ||
-      (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
+       (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
       PH = disk(PH; path=write_path)
     end
   end
@@ -598,7 +597,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
       maxtruncerr = 0.0
 
       if !isnothing(write_when_maxdim_exceeds) &&
-        maxdim(sweeps, sw) > write_when_maxdim_exceeds
+         maxdim(sweeps, sw) > write_when_maxdim_exceeds
         if outputlevel >= 2
           println(
             "\nWriting environment tensors do disk (write_when_maxdim_exceeds = $write_when_maxdim_exceeds and maxdim(sweeps, sw) = $(maxdim(sweeps, sw))).\nFiles located at path=$write_path\n",
@@ -615,10 +614,10 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
         PH = position!(PH, psi, b)
 
         #@timeit_debug timer "dmrg: psi[b]*psi[b+1]" begin
-        phi = psi[b] * psi[b + 1]
+        phi = psi[b] * psi[b+1]
         # end
         targetPsi = orthogonalize!(targetPsi, b)
-        targetphi = targetPsi[b] * targetPsi[b + 1]
+        targetphi = targetPsi[b] * targetPsi[b+1]
 
         #println("Limits" , limits)
         ortho = ha == 1 ? "left" : "right"
@@ -776,7 +775,7 @@ function dmrgX_one_site(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...
 
   if !isnothing(write_when_maxdim_exceeds)
     if (maxlinkdim(psi) > write_when_maxdim_exceeds) ||
-      (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
+       (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
       PH = disk(PH; path=write_path)
     end
   end
@@ -788,7 +787,7 @@ function dmrgX_one_site(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...
       maxtruncerr = 0.0
 
       if !isnothing(write_when_maxdim_exceeds) &&
-        maxdim(sweeps, sw) > write_when_maxdim_exceeds
+         maxdim(sweeps, sw) > write_when_maxdim_exceeds
         if outputlevel >= 2
           println(
             "\nWriting environment tensors do disk (write_when_maxdim_exceeds = $write_when_maxdim_exceeds and maxdim(sweeps, sw) = $(maxdim(sweeps, sw))).\nFiles located at path=$write_path\n",
