@@ -120,116 +120,12 @@ function extract_tensor(T::ITensor, bits::Vector{Int}, target_inds::Vector)
   return ITensor(T.tensor[extract_indices...], other_inds)
 end
 
-function dmrg_x_solver_new(
-  PH::ProjMPO,
-  psi0::MPS,
-  target::MPS,
-  b::Int,
-  sweeps,
-  sw,
-  ortho,
-  which_decomp,
-  svd_alg;
-  limits::Vector{}=[],
-  is_gs::Bool=false,
-)
-  # println(b)
-  H = contract(PH, ITensor(true))
-  # println(inds(H))
-  time_diag = @elapsed begin
-    D, U = eigen(H; ishermitian=true)
-  end
-  # println("-----\n Diagonalization time: ", time_diag)
-  #println(cutoff)
-  U_inds = inds(U)[1:(end - 1)]
-  eig_inds = inds(U)[end]
-  psi = deepcopy(psi0)
-
-  overlaps = zeros(eig_inds.space)
-  # println("EIG INDS: ", eig_inds)
-  sum_overlap = 0.0
-  max_ind = eig_inds.space
-  target_bitstring = extract_bitstring(target)
-  target_bitstring = Int.(target_bitstring)
-
-  is_growing = abs(D[1, 1]) < abs(D[end, end])
-  iteration_range = is_growing ? (1:(eig_inds.space)) : (eig_inds.space):-1:1
-
-  #Definition of left and right contractions that are not touched by the setcutoff
-  left = ITensor(1.0)
-  for j in 1:(b - 1)
-    site = siteind(psi, j)
-    left *= extract_tensor(psi[j], target_bitstring[j], site)
-    #left *= (psi[j] * state(site, target_bitstring[j]))
-  end
-  right = ITensor(1.0)
-  for j in (b + 2):length(psi)
-    site = siteind(psi, j)
-    right *= extract_tensor(psi[j], target_bitstring[j], site)
-    # println(right)
-    #right *= (psi[j] * state(site, target_bitstring[j]))
-  end
-
-  overlaps_time = @elapsed begin
-    for i in iteration_range
-      #X is the eigenvectors
-      ind = eig_inds[i]
-      eigenvector = U * onehot(ComplexF64, ind)
-
-      # println("------\n TARGET BITSTRING: ", target_bitstring, "\n")
-      # time_old = @elapsed overlap_old = get_amplitude(psi, target_bitstring)
-      # time_new = @elapsed overlap = get_amplitude2(psi, eigenvector, target_bitstring, b)
-      overlap = get_amplitude3(psi, eigenvector, target_bitstring, b, left, right)
-      # println("OVERLAP: ", abs(overlap), " OLD: ", abs(overlap_old))
-      # println(i)
-      # println("TIME OLD: ", time_old, " TIME NEW: ", time_new)
-      overlaps[ind.second] = abs(overlap)^2
-
-      sum_overlap += overlaps[ind.second]
-
-      if overlaps[ind.second] > overlaps[max_ind]
-        max_ind = ind.second
-      end
-
-      if overlaps[max_ind] > (1 - sum_overlap)
-        global max_overlap = overlaps[max_ind]
-        # N_iterations = is_growing ? i : eig_inds.space - i
-        # println("N_iterations: ", N_iterations)
-        global spec = replacebond!(
-          psi,
-          b,
-          eigenvector;
-          maxdim=maxdim(sweeps, sw),
-          mindim=mindim(sweeps, sw),
-          cutoff=cutoff(sweeps, sw),
-          ortho=ortho,
-          normalize=true,
-          which_decomp=which_decomp,
-          svd_alg=svd_alg,
-        )
-        break
-      end
-    end
-  end
-
-  u = uniqueind(U, H)
-
-  U_max = 0
-  eig = 0
-
-  U_max = U * dag(onehot(u => max_ind))
-  eig = D[max_ind, max_ind]
-
-  return U_max, eig, spec, psi
-end
-
 function partial_overlap(target::MPS, psi::MPS, b::Int)
   """ To change with ProjMPS"""
   N = length(psi)
   partial_state = 1
   indices_to_sum = [i for i in 1:N if i ∉ [b, b + 1]]
   for ind in 1:N
-    println(ind)
     partial_state *= target[ind]
     if ind in indices_to_sum
       partial_state *= psi[ind]
@@ -239,8 +135,8 @@ function partial_overlap(target::MPS, psi::MPS, b::Int)
 end
 
 function dmrg_x_solver(
-  PH::ProjMPO,
-  psi0::MPS,
+  PH::Union{ProjMPO,ITensors.DiskProjMPO},
+  psi::MPS,
   target::MPS,
   b::Int,
   sweeps,
@@ -255,7 +151,7 @@ function dmrg_x_solver(
   outputlevel::Int=0,
   kwargs...,
 )
-  gpu = occursin("CUDA", string(typeof(psi0[1].tensor)))
+  gpu = occursin("CUDA", string(typeof(psi[1].tensor)))
 
   function tn_wrapper(fun)
     if gpu
@@ -264,84 +160,98 @@ function dmrg_x_solver(
       return fun
     end
   end
-  target_reduced = partial_overlap(target, psi0, b)
+  target_reduced = partial_overlap(target, psi, b)
   if exact_diag
-    H = contract(PH, ITensor(true))
-    # H⁺ = swapprime(dag(H), 0 => 1)
-    # println(inds(H))
-    d, u = eigen(H; ishermitian=true)
-    u_ind = uniqueind(u, H)
-    u′_ind = uniqueind(d, u)
-    max_overlap, max_index = findmax(abs, array(target_reduced * dag(u)))
-    u_max = u * dag(tn_wrapper(onehot(eltype(u), u_ind => max_index)))
-    d_max = d[u′_ind => max_index, u_ind => max_index]
-
-    # time_diag = @elapsed begin
-    #   D, U = eigen(0.5 * (H + H⁺); ishermitian=true)
+    # time_m1 = @elapsed begin
+    #   H = contract(PH, ITensor(true))
+    #   # println(inds(H))
+    #   d, u = eigen(H; ishermitian=true)
+    #   u_ind = uniqueind(u, H)
+    #   u′_ind = uniqueind(d, u)
+    #   max_overlap_m1, max_ind_m1 = findmax(abs, array(target_reduced * dag(u)))
+    #   u_max_m1 = u * dag(tn_wrapper(onehot(eltype(u), u_ind => max_ind_m1)))
+    #   d_max_m1 = d[u′_ind=>max_ind_m1, u_ind=>max_ind_m1]
     # end
-    # println("-----\n Diagonalization time: ", time_diag)
-    #println(cutoff)
-    # U_inds = inds(U)[1:(end - 1)]
-    # eig_inds = inds(U)[end]
-    # psi = deepcopy(psi0)
-    # (max_overlap, max_ind) = findmax(abs, array(target_red * dag(U)))
+    # println(
+    #   "max_overlap_m1: ",
+    #   max_overlap_m1,
+    #   "\n max_ind_m1: ",
+    #   max_ind_m1,
+    #   "\n energy: ",
+    #   d_max_m1,
+    #   "\ntime_m1: ",
+    #   time_m1,
+    # )
+    time_m2 = @time begin
+      H = contract(PH, ITensor(true))
+      # println(inds(H))
+      d, u = eigen(H; ishermitian=true)
+      u_ind = uniqueind(u, H)
+      u′_ind = uniqueind(d, u)
+      overlaps = zeros(u_ind.space)
+      # println("EIG INDS: ", eig_inds)
+      sum_overlap = 0.0
+      overlaps_time = @elapsed begin
+        is_growing = abs(d[1, 1]) < abs(d[end, end])
+        iteration_range = is_growing ? (1:(u_ind.space)) : (u_ind.space):-1:1
+        max_ind = iteration_range[1]
+        N_iterations = 0
+        for i in iteration_range
+          N_iterations += 1
+          #X is the eigenvectors
+          ind = u_ind[i]
+          eigenvector = u * tn_wrapper(onehot(ComplexF64, ind))
 
-    # overlaps = zeros(eig_inds.space)
-    # # println("EIG INDS: ", eig_inds)
-    # sum_overlap = 0.0
-    # findmax(abs, array(state * dag(u)))
-    # overlaps_time = @elapsed begin
-    #   is_growing = abs(D[1, 1]) < abs(D[end, end])
-    #   iteration_range = is_growing ? (1:(eig_inds.space)) : (eig_inds.space):-1:1
-    #   max_ind = iteration_range[1]
-    #   N_iterations = 0
-    #   for i in iteration_range
-    #     N_iterations += 1
-    #     #X is the eigenvectors
-    #     ind = eig_inds[i]
-    #     if gpu
-    #       eigenvector = U * NDTensors.cu(onehot(ComplexF64, ind))
-    #     else
-    #       eigenvector = U * onehot(ComplexF64, ind)
-    #     end
-    #     global spec = replacebond!(
-    #       psi,
-    #       b,
-    #       eigenvector;
-    #       maxdim=maxdim(sweeps, sw),
-    #       mindim=mindim(sweeps, sw),
-    #       cutoff=cutoff(sweeps, sw),
-    #       ortho=ortho,
-    #       normalize=true,
-    #       which_decomp=which_decomp,
-    #       svd_alg=svd_alg,
-    #     )
+          spec = replacebond!(
+            psi,
+            b,
+            eigenvector;
+            maxdim=maxdim(sweeps, sw),
+            mindim=mindim(sweeps, sw),
+            cutoff=cutoff(sweeps, sw),
+            ortho=ortho,
+            normalize=true,
+            which_decomp=which_decomp,
+            svd_alg=svd_alg,
+          )
 
-    #     overlaps[ind.second] = abs(inner(psi, target))^2
-    #     sum_overlap += overlaps[ind.second]
-    #     if overlaps[ind.second] > overlaps[max_ind]
-    #       max_ind = ind.second
-    #     end
+          overlaps[ind.second] = abs(inner(psi, target))^2
+          sum_overlap += overlaps[ind.second]
+          if overlaps[ind.second] > overlaps[max_ind]
+            max_ind = ind.second
+          end
 
-    #     if overlaps[max_ind] > (1 - sum_overlap)
-    #       global max_overlap = overlaps[max_ind]
-    #       if outputlevel >= 2
-    #         println("max_ind: ", max_ind)
-    #         println("max overlap: ", max_overlap)
-    #         println("N_iterations: ", N_iterations)
-    #       end
-    #       break
-    #     end
-    #   end
+          if overlaps[max_ind] > (1 - sum_overlap)
+            global max_overlap = overlaps[max_ind]
+
+            # if outputlevel >= 2
+            #   println("max_ind: ", max_ind)
+            #   println("max overlap: ", max_overlap)
+            #   println("N_iterations: ", N_iterations)
+            # end
+            break
+          end
+        end
+      end
+    end
     if outputlevel >= 2
-      println("max_ind: ", max_index)
+      d_max = d[u′_ind => max_ind, u_ind => max_ind]
+      println("Method 2 max_ind: ", max_ind)
       println("max overlap: ", max_overlap)
+      println("time m2: ", time_m2)
       # println("N_iterations: ", N_iterations)
       println("eig", d_max)
+      println("\n\n\n")
       # end
     end
+    u_max = u * dag(tn_wrapper(onehot(eltype(u), u_ind => max_ind)))
+    d_max = d[u′_ind => max_ind, u_ind => max_ind]
+
+    # u_max = u_max_m1
+    # d_max = d_max_m1
+
     spec = replacebond!(
-      psi0,
+      psi,
       b,
       u_max;
       maxdim=maxdim(sweeps, sw),
@@ -353,17 +263,7 @@ function dmrg_x_solver(
       svd_alg=svd_alg,
     )
 
-    # u = uniqueind(U, H)
-
-    # U_max = 0
-    # eig = 0
-
-    # if gpu
-    #   U_max = U * NDTensors.cu(dag(onehot(u => max_ind)))
-    # else
-    #   U_max = U * dag(onehot(u => max_ind))
-    # end
-    # eig = D[max_ind, max_ind]
+    # println("time m2: ", time_m2)
 
     return u_max, d_max, spec, psi
 
@@ -616,7 +516,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
     error("quiet keyword has been replaced by outputlevel")
   end
 
-  psi = copy(psi0)
+  psi = deepcopy(psi0)
   N = length(psi)
 
   if !isortho(psi) || orthocenter(psi) != 1
@@ -626,7 +526,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
     targetPsi = orthogonalize!(PH, targetPsi, 1)
   end
   @assert isortho(psi) && orthocenter(psi) == 1
-
+  normalize!(psi)
   if !isnothing(write_when_maxdim_exceeds)
     if (maxlinkdim(psi) > write_when_maxdim_exceeds) ||
       (maxdim(sweeps, 1) > write_when_maxdim_exceeds)
@@ -661,6 +561,7 @@ function dmrgX(PH, psi0::MPS, targetPsi::MPS, sweeps::Sweeps; kwargs...)
         phi = psi[b] * psi[b + 1]
         # end
         targetPsi = orthogonalize!(targetPsi, b)
+        normalize!(targetPsi)
         targetphi = targetPsi[b] * targetPsi[b + 1]
 
         #println("Limits" , limits)
